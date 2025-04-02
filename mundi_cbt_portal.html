@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mundi College CBT Portal</title>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-storage-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/emailjs-com@2.6.4/dist/email.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <style>
+    body { font-family: Arial; padding: 2rem; background: #f5f5f5; }
+    h1, h2 { color: #333; }
+    section { background: white; padding: 1rem; margin-bottom: 1rem; border-radius: 8px; }
+    #admin-import, #admin-login { display: none; }
+    #status.success { color: green; }
+    #status.error { color: red; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Mundi College CBT Portal</h1>
+    <p><em>Raising Global Productive Citizens</em></p>
+    <nav><a href="#" onclick="showAdminLogin()">🛠 Importer des questions (admin)</a></nav>
+  </header>
+
+  <button onclick="showBulletinList()">📂 Voir les bulletins enregistrés</button>
+  <section id="admin-bulletins" style="display:none;">
+    <h2>Bulletins enregistrés</h2>
+    <div style="margin-top: 1rem;">
+  <input type="text" id="filterName" placeholder="Filtrer par nom..." oninput="filterBulletins()" />
+  <input type="text" id="filterDate" placeholder="Filtrer par date (2025-04-01)..." oninput="filterBulletins()" />
+  <input type="text" id="filterScore" placeholder="Filtrer par score (%)..." oninput="filterBulletins()" />
+</div>
+    <ul id="bulletinList"></ul>
+  </section>
+
+
+  <!-- New Results Section Button -->
+  <section id="results" style="display:none;">
+    <h2>Results</h2>
+    <p id="scoreDisplay"></p>
+    <p>Check your email for your report.</p>
+    <button onclick="downloadStudentPDF()">📄 Télécharger le bulletin PDF</button>
+  </section>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDpPkeHUzUs2_YkBZb0dIXOl19QSRJ60Jg",
+      authDomain: "mundicbt.firebaseapp.com",
+      projectId: "mundicbt",
+      storageBucket: "mundicbt.appspot.com",
+      messagingSenderId: "639240044594",
+      appId: "1:639240044594:web:7257381785be86c87afc2b"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const auth = firebase.auth();
+    const storage = firebase.storage();
+    emailjs.init("YOUR_EMAILJS_USER_ID");
+    
+function renderBulletinList(entries) {
+  const list = document.getElementById('bulletinList');
+  const nameFilter = document.getElementById('filterName').value.toLowerCase();
+  const dateFilter = document.getElementById('filterDate').value;
+  const scoreFilter = document.getElementById('filterScore').value;
+
+  list.innerHTML = '';
+  entries.forEach(entry => {
+    if (
+      (nameFilter && !entry.name.toLowerCase().includes(nameFilter)) ||
+      (dateFilter && !entry.date.includes(dateFilter)) ||
+      (scoreFilter && entry.score !== scoreFilter)
+    ) {
+      return;
+    }
+    const li = document.createElement('li');
+    li.innerHTML = `<a href="${entry.url}" target="_blank">${entry.raw}</a>`;
+    list.appendChild(li);
+  });
+}
+
+function filterBulletins() {
+  showBulletinList();
+}
+
+    function showBulletinList() {
+  const listSection = document.getElementById('admin-bulletins');
+  const list = document.getElementById('bulletinList');
+  list.innerHTML = '';
+  listSection.style.display = 'block';
+
+  storage.ref('bulletins').listAll().then((res) => {
+    const bulletinEntries = [];
+    res.items.forEach((itemRef) => {
+      itemRef.getDownloadURL().then((url) => {
+        const nameMatch = itemRef.name.match(/^(.+?)_(\\d+)/);
+        const name = nameMatch ? nameMatch[1] : 'Inconnu';
+        const timestamp = nameMatch ? parseInt(nameMatch[2]) : Date.now();
+        const date = new Date(timestamp).toISOString().split('T')[0];
+        const score = 'N/A'; // À améliorer si vous stockez le score dans le nom
+
+        bulletinEntries.push({ name, date, score, url, raw: itemRef.name });
+        renderBulletinList(bulletinEntries);
+      });
+    });
+  }).catch((error) => {
+    console.error("Erreur de récupération des bulletins:", error);
+  });
+}
+
+
+    let latestPDFContent = "";
+
+    async function generateAndUploadPDF(name, className, score) {
+      const pdfContent = `
+        <div style="font-family: Arial; padding: 20px;">
+          <h2>MUNDI COLLEGE & PRIMARY</h2>
+          <h3>French Everything Bilingual School</h3>
+          <p><strong>Nom :</strong> ${name}</p>
+          <p><strong>Classe :</strong> ${className}</p>
+          <p><strong>Score :</strong> ${score}%</p>
+          <p><strong>Date :</strong> ${new Date().toLocaleDateString()}</p>
+          <br>
+          <p><em>« Raising Global Productive Citizens »</em></p>
+        </div>`;
+
+      latestPDFContent = pdfContent; // Store for download
+
+      const opt = { margin: 1, filename: `${name}_bulletin.pdf`, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } };
+      const blob = await html2pdf().from(pdfContent).set(opt).outputPdf('blob');
+      const storageRef = storage.ref().child(`bulletins/${name}_${Date.now()}.pdf`);
+      await storageRef.put(blob);
+    }
+
+    function downloadStudentPDF() {
+      if (!latestPDFContent) return;
+      const opt = { margin: 1, filename: `bulletin.pdf`, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } };
+      html2pdf().from(latestPDFContent).set(opt).save();
+    }
+
+    cbtForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      let score = 0;
+      let total = Object.keys(correctAnswers).length;
+      for (let key in correctAnswers) {
+        let selected = document.querySelector(`input[name='${key}']:checked`);
+        if (selected && selected.value === correctAnswers[key]) score++;
+      }
+      const percent = (score / total * 100).toFixed(2);
+      document.getElementById('questions-section').style.display = 'none';
+      document.getElementById('results').style.display = 'block';
+      document.getElementById('scoreDisplay').textContent = `Score: ${score}/${total} (${percent}%)`;
+
+      await db.collection("scores").add({
+        name: studentName,
+        class: studentClass,
+        email: studentEmail,
+        score: percent,
+        date: new Date()
+      });
+
+      await generateAndUploadPDF(studentName, studentClass, percent);
+
+      emailjs.send("YOUR_SERVICE_ID", "template_pwfl05a", {
+        to_name: studentName,
+        to_email: studentEmail,
+        score: percent,
+        download_link: `Lien de téléchargement du bulletin disponible via l'école`
+      });
+    });
+  </script>
+</body>
+</html>
