@@ -1,0 +1,23 @@
+{
+  "name": "mundicol-lms-sms-site-cbt",
+  "version": "1.0.0",
+  "description": "Complete website for mundicol",
+  "main": "importQuestions.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/patrickmundi/mundicol-cbt.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/patrickmundi/mundicol-cbt/issues"
+  },
+  "homepage": "https://github.com/patrickmundi/mundicol-cbt#readme",
+  "dependencies": {
+    "firebase-admin": "^13.2.0"
+  }
+}
