@@ -1,0 +1,24 @@
+# Node modules and environments
+node_modules/
+
+# Archives
+*.zip
+
+# Excel files
+*.xlsm
+*.csv
+
+# Scripts exécutables
+*.bat
+*.vbs
+
+# PDF and other binaries
+*.pdf
+
+# Firestore private key
+serviceAccountKey.json
+
+# System files
+.DS_Store
+Thumbs.db
+*.log
